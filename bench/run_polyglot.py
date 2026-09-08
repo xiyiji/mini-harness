@@ -185,6 +185,18 @@ def main() -> None:
     parser.add_argument("--out", default=str(Path(__file__).with_name("report.md")))
     args = parser.parse_args()
 
+    # Every finished exercise is appended here as it completes, and any
+    # exercise already present is skipped. A run that is interrupted - the
+    # machine goes away, the budget is raised - continues where it stopped
+    # rather than paying for the same exercises twice.
+    ledger = Path(args.out).with_suffix(".jsonl")
+    done: dict[tuple[str, str], Outcome] = {}
+    if ledger.exists():
+        for line in ledger.read_text().splitlines():
+            if line.strip():
+                row = Outcome(**json.loads(line))
+                done[(row.language, row.exercise)] = row
+
     repo = Path(args.repo).resolve()
     workroot = Path(args.work)
     workroot.mkdir(parents=True, exist_ok=True)
@@ -195,6 +207,10 @@ def main() -> None:
     for language in args.languages:
         lang = LANGUAGES[language]
         for exercise in pick(repo, language, args.per_language, args.seed):
+            if (language, exercise.name) in done:
+                results.append(done[(language, exercise.name)])
+                spent += results[-1].cost_usd
+                continue
             if spent >= args.budget_usd:
                 print(f"budget reached (${spent:.2f}); stopping")
                 break
@@ -244,6 +260,8 @@ def main() -> None:
                     tools=telemetry.get("calls_by_tool", {}),
                 )
             )
+            with ledger.open("a") as f:
+                f.write(json.dumps(asdict(results[-1])) + "\n")
             mark = "pass" if results[-1].passed else "FAIL"
             print(
                 f"  {language:8s} {exercise.name:28s} {mark:5s} "
