@@ -20,7 +20,7 @@ from pathlib import Path
 from openai import LengthFinishReasonError, OpenAI
 
 from mini_harness.compact import COMPACT
-from mini_harness.config import CONFIG
+from mini_harness.config import CONFIG, api_key
 from mini_harness.retry_request import retry_call
 from mini_harness.tool.block import CLIP
 from mini_harness.tool.box import (
@@ -278,7 +278,7 @@ class DeepSeekAgent:
 
     def _client(self, cfg=CONFIG) -> OpenAI:
         # max_retries=0: we do our own retrying in retry_call, with printing and backoff we control
-        return OpenAI(api_key=os.environ.get("DEEPSEEK_API_KEY"), base_url=cfg.base_url, max_retries=0)
+        return OpenAI(api_key=api_key(), base_url=cfg.base_url, max_retries=0)
 
     def run_task(self, task: str, cfg=CONFIG) -> Result:
         """Unattended: one task, no confirmation prompts, returns telemetry."""

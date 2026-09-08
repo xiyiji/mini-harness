@@ -118,9 +118,9 @@ BENCH_OVERRIDE: dict = {
     "wall_budget": None,
     "guard_read": False,
     "guard_write": False,
-    "session_path": "/logs/agent/mini_harness_session.json",
+    "session_path": os.environ.get("MINI_HARNESS_SESSION", "/logs/agent/mini_harness_session.json"),
     "deny_name": (),
     "deny_dir": frozenset(),
-    "bash_env_deny": ("DEEPSEEK_API_KEY",),
+    "bash_env_deny": ("DEEPSEEK_API_KEY", "MINI_HARNESS_API_KEY", "ANTHROPIC_API_KEY"),
     "system_prompt": BENCH_PROMPT,
 }

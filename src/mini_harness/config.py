@@ -19,8 +19,29 @@ from mini_harness.bench_profile import BENCH_OVERRIDE
 if not os.environ.get("PYTHON_DOTENV_DISABLED"):
     load_dotenv(find_dotenv(usecwd=True))
 
-if not os.environ.get("DEEPSEEK_API_KEY"):
-    raise RuntimeError("[api error]: DEEPSEEK_API_KEY is not set")
+def api_key() -> str:
+    """The key for whatever endpoint base_url points at.
+
+    MINI_HARNESS_API_KEY wins so the harness can be pointed at another
+    OpenAI-compatible provider - a benchmark run, a local proxy - without
+    pretending the key is DeepSeek's.
+    """
+    return os.environ.get("MINI_HARNESS_API_KEY") or os.environ.get("DEEPSEEK_API_KEY", "")
+
+
+if not api_key():
+    raise RuntimeError("[api error]: set MINI_HARNESS_API_KEY or DEEPSEEK_API_KEY")
+
+
+def _model(default: str = "deepseek-v4-flash") -> str:
+    return os.environ.get("MINI_HARNESS_MODEL", default)
+
+
+def _int_env(name: str, default: int) -> int:
+    try:
+        return int(os.environ[name])
+    except (KeyError, ValueError):
+        return default
 
 
 def default_workspace() -> Path:
@@ -35,17 +56,22 @@ class Config:
     profile: str = "local"
 
     # --- model ---
-    model_main: str = "deepseek-v4-flash"
-    model_sub: str = "deepseek-v4-flash"
+    model_main: str = _model()
+    model_sub: str = os.environ.get("MINI_HARNESS_MODEL_SUB", _model())
     # MINI_HARNESS_BASE_URL lets you point at a fake server (tests/fake_server.py) or a proxy.
     base_url: str = os.environ.get("MINI_HARNESS_BASE_URL", "https://api.deepseek.com")
     max_turns_main: int = 50      # tool-call rounds per user message
     max_turns_sub: int = 20       # same, for a subagent
-    max_tokens_main: int = 100000
-    max_tokens_sub: int = 50000
+    # Output-token ceiling per request. Providers cap this differently, so a
+    # benchmark run that swaps the model has to be able to swap the ceiling.
+    max_tokens_main: int = _int_env("MINI_HARNESS_MAX_TOKENS", 100000)
+    max_tokens_sub: int = _int_env("MINI_HARNESS_MAX_TOKENS_SUB", 50000)
     temp_set: float = 0.5
-    think_main: str = "enabled"   # DeepSeek "thinking" mode
-    think_sub: str = "enabled"
+    # DeepSeek "thinking" mode. MINI_HARNESS_THINKING=off sends no extra body at
+    # all, which is what other OpenAI-compatible endpoints need - an unknown
+    # field is a 400 there, not something to ignore.
+    think_main: str = os.environ.get("MINI_HARNESS_THINKING", "enabled")
+    think_sub: str = os.environ.get("MINI_HARNESS_THINKING", "enabled")
 
     # --- tool limits ---
     max_read_size: int = 512000   # bytes; read_file without offset/limit refuses bigger files
@@ -199,11 +225,11 @@ O2. run_subagent (explore_agent, coding_agent, planning_agent): use it when a su
 
     @property
     def thinking_main(self) -> dict:
-        return {"thinking": {"type": self.think_main}}
+        return {} if self.think_main == "off" else {"thinking": {"type": self.think_main}}
 
     @property
     def thinking_sub(self) -> dict:
-        return {"thinking": {"type": self.think_sub}}
+        return {} if self.think_sub == "off" else {"thinking": {"type": self.think_sub}}
 
     @property
     def bash_env(self) -> dict:
