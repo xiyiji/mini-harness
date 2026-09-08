@@ -5,6 +5,11 @@ streaming, nine tools defined with Pydantic, read-before-write gating on file
 edits, context compaction, request retries, a Docker sandbox, subagents, and
 an optional terminal UI.
 
+**Solves 24 of 25 exercises (96%)** from the
+[polyglot benchmark](https://github.com/Aider-AI/polyglot-benchmark) with
+`claude-haiku-4-5` — Python 12/12, Go 11/12, Rust 1/1 — scored by each
+exercise's own test suite. See [bench/report.md](bench/report.md).
+
 Stack: Python 3.12, `openai` SDK (DeepSeek endpoint), Pydantic 2, Textual for
 the TUI, uv for packaging. Docker is optional and only used by `run_sandbox`.
 
@@ -126,6 +131,27 @@ The same server backs the test suite:
 DEEPSEEK_API_KEY=x uv run pytest -q
 ```
 
+## Benchmark
+
+```sh
+git clone --depth 1 https://github.com/Aider-AI/polyglot-benchmark ../polyglot-benchmark
+export MINI_HARNESS_API_KEY=...            # any OpenAI-compatible endpoint
+export MINI_HARNESS_BASE_URL=https://api.anthropic.com/v1
+export MINI_HARNESS_MODEL=claude-haiku-4-5 MINI_HARNESS_THINKING=off
+export MINI_HARNESS_MAX_TOKENS=8000 MINI_HARNESS_MAX_TURNS=40
+uv run python bench/run_polyglot.py --repo ../polyglot-benchmark \
+    --languages python go rust --per-language 12 --budget-usd 6
+```
+
+The driver copies each exercise without its reference solution, hands the
+agent the instructions, the stub and the test command, and scores with the
+exercise's own tests afterwards. A run that edits a test file is a failure.
+Rust runs with `--include-ignored`, since Exercism marks every test after the
+first as ignored. Finished exercises are appended to `bench/report.jsonl`, so
+an interrupted run resumes where it stopped. `MINI_HARNESS_MAX_TURNS` caps one
+exercise: every turn resends the conversation, and one exercise that loops for
+fifty turns costs more than thirty that finish in ten.
+
 ## Benchmark profile
 
 `MINI_HARNESS_PROFILE=bench` raises the turn and timeout limits, disables the
@@ -138,5 +164,7 @@ prints one JSON line prefixed with `####MINI_HARNESS_RUN####` and exits with
 
 Everything is a field on `Config` in `config.py`. Environment overrides:
 `MINI_HARNESS_WORK_SPACE`, `MINI_HARNESS_BASE_URL`, `MINI_HARNESS_PROFILE`,
-`MINI_HARNESS_WALL_BUDGET`. A `.env` in the working directory is loaded for
-`DEEPSEEK_API_KEY`.
+`MINI_HARNESS_WALL_BUDGET`, `MINI_HARNESS_MODEL`, `MINI_HARNESS_API_KEY`,
+`MINI_HARNESS_THINKING` (`off` for endpoints that are not DeepSeek),
+`MINI_HARNESS_MAX_TOKENS`, `MINI_HARNESS_MAX_TURNS`, `MINI_HARNESS_SESSION`.
+A `.env` in the working directory is loaded for `DEEPSEEK_API_KEY`.
