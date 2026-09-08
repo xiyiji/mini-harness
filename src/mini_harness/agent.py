@@ -12,7 +12,6 @@ the model getting cut off or the human pressing Ctrl+C.
 """
 
 import json
-import os
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path

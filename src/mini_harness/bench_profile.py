@@ -113,7 +113,10 @@ O2. run_subagent is available (explore_agent, coding_agent, planning_agent). Use
 
 BENCH_OVERRIDE: dict = {
     "profile": "bench",
-    "max_turns_main": 300,
+    # A benchmark exercise that has not converged in a few dozen turns is
+    # looping, and every further turn re-sends the whole conversation. One
+    # runaway can cost more than the other thirty exercises together.
+    "max_turns_main": int(os.environ.get("MINI_HARNESS_MAX_TURNS", "300")),
     "bash_timeout": 300,
     "wall_budget": None,
     "guard_read": False,
